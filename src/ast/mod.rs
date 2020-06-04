@@ -33,9 +33,9 @@ use crate::build::Val;
 use crate::error::{BuildError, ErrorType::TypeFail};
 
 pub mod printer;
+pub mod rewrite;
+pub mod typecheck;
 pub mod walk;
-
-pub use walk::Walker;
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum TemplatePart {
@@ -679,74 +679,6 @@ impl ModuleDef {
 
     pub fn set_out_expr(&mut self, expr: Expression) {
         self.out_expr = Some(Box::new(expr));
-    }
-}
-
-pub struct Rewriter {
-    base: PathBuf,
-}
-
-impl Rewriter {
-    pub fn new<P: Into<PathBuf>>(base: P) -> Self {
-        Self { base: base.into() }
-    }
-}
-
-impl walk::Walker for Rewriter {
-    fn visit_expression(&mut self, expr: &mut Expression) {
-        // Rewrite all paths except for stdlib paths to absolute.
-        let main_separator = format!("{}", std::path::MAIN_SEPARATOR);
-        if let Expression::Include(ref mut def) = expr {
-            let path = PathBuf::from(&def.path.fragment);
-            #[cfg(not(windows))]
-            {
-                if path.is_relative() {
-                    def.path.fragment = self
-                        .base
-                        .join(path)
-                        .canonicalize()
-                        .unwrap()
-                        .to_string_lossy()
-                        .to_string();
-                }
-            }
-            #[cfg(windows)]
-            {
-                if path.is_relative() {
-                    def.path.fragment = self.base.join(path).to_string_lossy().to_string();
-                }
-            }
-        }
-        if let Expression::Import(ref mut def) = expr {
-            let path = PathBuf::from(
-                &def.path
-                    .fragment
-                    .replace("/", &main_separator)
-                    .replace("\\", &main_separator),
-            );
-            // std/ paths are special and do not get made into absolute paths.
-            if path.starts_with(format!("std{}", main_separator)) {
-                return;
-            }
-            #[cfg(not(windows))]
-            {
-                if path.is_relative() {
-                    def.path.fragment = self
-                        .base
-                        .join(path)
-                        .canonicalize()
-                        .unwrap()
-                        .to_string_lossy()
-                        .to_string();
-                }
-            }
-            #[cfg(windows)]
-            {
-                if path.is_relative() {
-                    def.path.fragment = self.base.join(path).to_string_lossy().to_string();
-                }
-            }
-        }
     }
 }
 
